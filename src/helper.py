@@ -2,17 +2,13 @@ import os
 from typing import List
 
 from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader
-from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_core.documents import Document
+from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-# Avoid HuggingFace XET downloader panics on cloud hosts (Render, Docker, etc.)
-os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
-os.environ.setdefault("HF_HUB_ENABLE_HF_TRANSFER", "0")
 
 
 def _ensure_ca_bundle():
-    """Point SSL libs at certifi so HuggingFace/OpenAI/Pinecone work on Linux."""
+    """Point SSL libs at certifi for OpenAI / Pinecone on Linux (Render)."""
     try:
         import certifi
 
@@ -27,9 +23,7 @@ def _ensure_ca_bundle():
 def _maybe_disable_ssl_verify():
     """
     Local-only workaround for corporate SSL inspection (Windows).
-
-    Do NOT enable DISABLE_SSL_VERIFY on Render / Docker / Linux production —
-    clearing CA bundles breaks HuggingFace downloads there.
+    Do NOT set DISABLE_SSL_VERIFY on Render.
     """
     flag = os.getenv("DISABLE_SSL_VERIFY", "").lower()
     if flag not in ("1", "true", "yes"):
@@ -40,7 +34,6 @@ def _maybe_disable_ssl_verify():
 
     ssl._create_default_https_context = ssl._create_unverified_context
     os.environ["PYTHONHTTPSVERIFY"] = "0"
-    # Keep certifi paths set — emptying them causes "No CA certificates were loaded"
     _ensure_ca_bundle()
 
     try:
@@ -76,27 +69,6 @@ def _maybe_disable_ssl_verify():
         pass
 
     try:
-        import requests
-        from huggingface_hub import configure_http_backend
-
-        _original_request = requests.Session.request
-
-        def _insecure_request(self, method, url, **kwargs):
-            kwargs["verify"] = False
-            return _original_request(self, method, url, **kwargs)
-
-        requests.Session.request = _insecure_request
-
-        def _backend_factory():
-            session = requests.Session()
-            session.verify = False
-            return session
-
-        configure_http_backend(backend_factory=_backend_factory)
-    except Exception:
-        pass
-
-    try:
         import httpx
 
         _orig_httpx_client_init = httpx.Client.__init__
@@ -116,11 +88,9 @@ def _maybe_disable_ssl_verify():
         pass
 
 
-# Apply early when helper is imported after dotenv is loaded by callers.
 _maybe_disable_ssl_verify()
 
 
-# Extract Data From the PDF File
 def load_pdf_file(data):
     loader = DirectoryLoader(data, glob="*.pdf", loader_cls=PyPDFLoader)
     documents = loader.load()
@@ -128,10 +98,6 @@ def load_pdf_file(data):
 
 
 def filter_to_minimal_docs(docs: List[Document]) -> List[Document]:
-    """
-    Given a list of Document objects, return a new list of Document objects
-    containing only 'source' in metadata and the original page_content.
-    """
     minimal_docs: List[Document] = []
     for doc in docs:
         src = doc.metadata.get("source")
@@ -141,31 +107,24 @@ def filter_to_minimal_docs(docs: List[Document]) -> List[Document]:
     return minimal_docs
 
 
-# Split the Data into Text Chunks
 def text_split(extracted_data):
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=20)
     text_chunks = text_splitter.split_documents(extracted_data)
     return text_chunks
 
 
-# Download / load HuggingFace embeddings (384 dimensions)
-def download_hugging_face_embeddings():
+def get_embeddings():
+    """
+    OpenAI embeddings (384-dim) — no HuggingFace model download.
+    Works reliably on Render.
+    """
     _maybe_disable_ssl_verify()
-    model_name = os.getenv(
-        "EMBEDDING_MODEL_NAME", "sentence-transformers/all-MiniLM-L6-v2"
+    return OpenAIEmbeddings(
+        model=os.getenv("EMBEDDING_MODEL_NAME", "text-embedding-3-small"),
+        dimensions=int(os.getenv("EMBEDDING_DIMENSIONS", "384")),
     )
-    # Prefer a local cache path if the model was baked into the image
-    cache_folder = os.getenv("EMBEDDING_CACHE_FOLDER", "/app/.cache/huggingface")
-    model_kwargs = {"device": "cpu"}
-    encode_kwargs = {"normalize_embeddings": False}
-    try:
-        embeddings = HuggingFaceEmbeddings(
-            model_name=model_name,
-            cache_folder=cache_folder,
-            model_kwargs=model_kwargs,
-            encode_kwargs=encode_kwargs,
-        )
-    except TypeError:
-        # Older langchain-community may not accept cache_folder
-        embeddings = HuggingFaceEmbeddings(model_name=model_name)
-    return embeddings
+
+
+# Backwards-compatible alias used by older scripts
+def download_hugging_face_embeddings():
+    return get_embeddings()

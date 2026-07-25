@@ -6,7 +6,7 @@ load_dotenv()
 
 from flask import Flask, render_template, jsonify, request
 from flask_cors import CORS
-from src.helper import download_hugging_face_embeddings
+from src.helper import get_embeddings
 from langchain_pinecone import PineconeVectorStore
 from langchain_openai import ChatOpenAI
 from langchain.chains import create_retrieval_chain
@@ -25,6 +25,7 @@ ALLOWED_ORIGINS = [
     if origin.strip()
 ]
 WIDGET_API_KEY = os.getenv("WIDGET_API_KEY", "").strip()
+INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "enertech-chatbot")
 
 if not PINECONE_API_KEY:
     raise ValueError("PINECONE_API_KEY not found.")
@@ -43,11 +44,10 @@ CORS(
     },
 )
 
-embeddings = download_hugging_face_embeddings()
+embeddings = get_embeddings()
 
-index_name = "enertech-chatbot"
 docsearch = PineconeVectorStore.from_existing_index(
-    index_name=index_name,
+    index_name=INDEX_NAME,
     embedding=embeddings,
 )
 
