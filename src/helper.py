@@ -6,20 +6,42 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+# Avoid HuggingFace XET downloader panics on cloud hosts (Render, Docker, etc.)
+os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
+os.environ.setdefault("HF_HUB_ENABLE_HF_TRANSFER", "0")
+
+
+def _ensure_ca_bundle():
+    """Point SSL libs at certifi so HuggingFace/OpenAI/Pinecone work on Linux."""
+    try:
+        import certifi
+
+        ca = certifi.where()
+        os.environ.setdefault("SSL_CERT_FILE", ca)
+        os.environ.setdefault("REQUESTS_CA_BUNDLE", ca)
+        os.environ.setdefault("CURL_CA_BUNDLE", ca)
+    except Exception:
+        pass
+
 
 def _maybe_disable_ssl_verify():
-    """Allow model downloads behind corporate SSL inspection."""
+    """
+    Local-only workaround for corporate SSL inspection (Windows).
+
+    Do NOT enable DISABLE_SSL_VERIFY on Render / Docker / Linux production —
+    clearing CA bundles breaks HuggingFace downloads there.
+    """
     flag = os.getenv("DISABLE_SSL_VERIFY", "").lower()
     if flag not in ("1", "true", "yes"):
+        _ensure_ca_bundle()
         return
 
     import ssl
 
     ssl._create_default_https_context = ssl._create_unverified_context
-    os.environ["CURL_CA_BUNDLE"] = ""
-    os.environ["REQUESTS_CA_BUNDLE"] = ""
-    os.environ["SSL_CERT_FILE"] = ""
     os.environ["PYTHONHTTPSVERIFY"] = "0"
+    # Keep certifi paths set — emptying them causes "No CA certificates were loaded"
+    _ensure_ca_bundle()
 
     try:
         import urllib3
@@ -126,10 +148,24 @@ def text_split(extracted_data):
     return text_chunks
 
 
-# Download the Embeddings from HuggingFace (384 dimensions)
+# Download / load HuggingFace embeddings (384 dimensions)
 def download_hugging_face_embeddings():
     _maybe_disable_ssl_verify()
-    embeddings = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2"
+    model_name = os.getenv(
+        "EMBEDDING_MODEL_NAME", "sentence-transformers/all-MiniLM-L6-v2"
     )
+    # Prefer a local cache path if the model was baked into the image
+    cache_folder = os.getenv("EMBEDDING_CACHE_FOLDER", "/app/.cache/huggingface")
+    model_kwargs = {"device": "cpu"}
+    encode_kwargs = {"normalize_embeddings": False}
+    try:
+        embeddings = HuggingFaceEmbeddings(
+            model_name=model_name,
+            cache_folder=cache_folder,
+            model_kwargs=model_kwargs,
+            encode_kwargs=encode_kwargs,
+        )
+    except TypeError:
+        # Older langchain-community may not accept cache_folder
+        embeddings = HuggingFaceEmbeddings(model_name=model_name)
     return embeddings
