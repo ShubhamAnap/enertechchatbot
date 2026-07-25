@@ -1,7 +1,46 @@
 import os
+import ssl
 import time
 
 from dotenv import load_dotenv
+
+load_dotenv()
+
+# Local Windows SSL workaround (not needed on Render)
+if os.getenv("DISABLE_SSL_VERIFY", "").lower() in ("1", "true", "yes"):
+    ssl._create_default_https_context = ssl._create_unverified_context
+    os.environ["PYTHONHTTPSVERIFY"] = "0"
+    try:
+        import requests
+
+        _orig = requests.Session.request
+
+        def _insecure(self, method, url, **kwargs):
+            kwargs["verify"] = False
+            return _orig(self, method, url, **kwargs)
+
+        requests.Session.request = _insecure
+    except Exception:
+        pass
+    try:
+        import httpx
+
+        _c = httpx.Client.__init__
+        _a = httpx.AsyncClient.__init__
+
+        def _ci(self, *args, **kwargs):
+            kwargs["verify"] = False
+            return _c(self, *args, **kwargs)
+
+        def _ai(self, *args, **kwargs):
+            kwargs["verify"] = False
+            return _a(self, *args, **kwargs)
+
+        httpx.Client.__init__ = _ci
+        httpx.AsyncClient.__init__ = _ai
+    except Exception:
+        pass
+
 from langchain_pinecone import PineconeVectorStore
 from pinecone import Pinecone, ServerlessSpec
 
@@ -11,8 +50,6 @@ from src.helper import (
     load_pdf_file,
     text_split,
 )
-
-load_dotenv()
 
 PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
