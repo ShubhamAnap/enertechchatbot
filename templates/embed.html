@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EnerTech Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --primary: #0B2388;
+      --white: #FFFFFF;
+      --bg: #F5F7FC;
+      --text: #1A2140;
+      --muted: #6B7394;
+      --border: #E6EAF5;
+      --input-bg: #F8F9FD;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      font-family: "Plus Jakarta Sans", Segoe UI, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .chat {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      background: var(--white);
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 18px;
+      background: var(--primary);
+      color: var(--white);
+    }
+    .header img {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--white);
+      object-fit: contain;
+      padding: 3px;
+    }
+    .header strong {
+      display: block;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+    .header span {
+      display: block;
+      font-size: 12px;
+      opacity: 0.9;
+      margin-top: 3px;
+      font-weight: 500;
+    }
+    .status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #4ADE80;
+      margin-right: 6px;
+    }
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: var(--bg);
+    }
+    .bubble {
+      max-width: 84%;
+      padding: 11px 14px;
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-weight: 500;
+    }
+    .bot {
+      align-self: flex-start;
+      background: var(--white);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-bottom-left-radius: 6px;
+      box-shadow: 0 2px 8px rgba(11, 35, 136, 0.04);
+    }
+    .user {
+      align-self: flex-end;
+      background: var(--primary);
+      color: var(--white);
+      border-bottom-right-radius: 6px;
+      box-shadow: 0 4px 14px rgba(11, 35, 136, 0.2);
+    }
+    .typing {
+      align-self: flex-start;
+      background: var(--white);
+      color: var(--muted);
+      font-size: 13px;
+      padding: 10px 14px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      font-weight: 500;
+    }
+    .footer {
+      display: flex;
+      gap: 10px;
+      padding: 14px;
+      background: var(--white);
+      border-top: 1px solid var(--border);
+    }
+    .footer input {
+      flex: 1;
+      border: 1px solid #D9E0F2;
+      outline: none;
+      border-radius: 12px;
+      padding: 12px 14px;
+      background: var(--input-bg);
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+      font-weight: 500;
+    }
+    .footer input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(11, 35, 136, 0.12);
+      background: var(--white);
+    }
+    .footer input::placeholder { color: #8B93B0; }
+    .footer button {
+      border: none;
+      border-radius: 12px;
+      padding: 0 18px;
+      cursor: pointer;
+      background: var(--primary);
+      color: var(--white);
+      font-weight: 700;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    .footer button:hover { opacity: 0.92; }
+    .footer button:disabled { opacity: 0.55; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <div class="chat">
+    <div class="header">
+      <img src="https://enertechups.com/wp-content/uploads/2022/10/Logo1-removebg-preview.png" alt="EnerTech" />
+      <div>
+        <strong>EnerTech Assistant</strong>
+        <span><i class="status-dot"></i>Online · Ready to help</span>
+      </div>
+    </div>
+    <div class="messages" id="messages"></div>
+    <form class="footer" id="chatForm">
+      <input id="msgInput" type="text" placeholder="Type your message..." autocomplete="off" required />
+      <button type="submit" id="sendBtn">Send</button>
+    </form>
+  </div>
+
+  <script>
+    (function () {
+      var messagesEl = document.getElementById("messages");
+      var form = document.getElementById("chatForm");
+      var input = document.getElementById("msgInput");
+      var sendBtn = document.getElementById("sendBtn");
+      var busy = false;
+
+      addMessage("Hello! I'm your EnerTech assistant. Ask me about UPS, batteries, or power solutions.", "bot");
+
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var text = (input.value || "").trim();
+        if (!text || busy) return;
+        input.value = "";
+        addMessage(text, "user");
+        sendMessage(text);
+      });
+
+      function addMessage(text, role) {
+        var bubble = document.createElement("div");
+        bubble.className = "bubble " + role;
+        bubble.textContent = text;
+        messagesEl.appendChild(bubble);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function setTyping(show) {
+        var existing = messagesEl.querySelector(".typing");
+        if (existing) existing.remove();
+        if (!show) return;
+        var el = document.createElement("div");
+        el.className = "typing";
+        el.textContent = "Typing...";
+        messagesEl.appendChild(el);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function sendMessage(text) {
+        busy = true;
+        sendBtn.disabled = true;
+        setTyping(true);
+
+        fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text }),
+        })
+          .then(function (res) {
+            return res.json().then(function (data) {
+              if (!res.ok) throw new Error((data && data.error) || "Request failed");
+              return data;
+            });
+          })
+          .then(function (data) {
+            setTyping(false);
+            addMessage(data.answer || "No response received.", "bot");
+          })
+          .catch(function () {
+            setTyping(false);
+            addMessage("Sorry, I couldn't reach the assistant. Please try again later.", "bot");
+          })
+          .finally(function () {
+            busy = false;
+            sendBtn.disabled = false;
+            input.focus();
+          });
+      }
+    })();
+  </script>
+</body>
+</html>

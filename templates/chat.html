@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EnerTech Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <div class="page">
+    <div class="chat-shell">
+      <header class="chat-header">
+        <img
+          src="https://enertechups.com/wp-content/uploads/2022/10/Logo1-removebg-preview.png"
+          alt="EnerTech"
+          class="avatar"
+        />
+        <div class="header-text">
+          <h1>EnerTech Assistant</h1>
+          <p><span class="status-dot"></span>Online · Ready to help</p>
+        </div>
+      </header>
+
+      <div id="messageFormeight" class="messages"></div>
+
+      <form id="messageArea" class="composer">
+        <input
+          type="text"
+          id="text"
+          name="msg"
+          placeholder="Type your message..."
+          autocomplete="off"
+          required
+        />
+        <button type="submit" id="send">Send</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var messagesEl = document.getElementById("messageFormeight");
+      var form = document.getElementById("messageArea");
+      var input = document.getElementById("text");
+      var sendBtn = document.getElementById("send");
+      var busy = false;
+
+      addMessage(
+        "Hello! I'm your EnerTech assistant. Ask me about UPS, batteries, or power solutions.",
+        "bot"
+      );
+
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var rawText = (input.value || "").trim();
+        if (!rawText || busy) return;
+
+        input.value = "";
+        addMessage(rawText, "user");
+        sendMessage(rawText);
+      });
+
+      function addMessage(text, role) {
+        var row = document.createElement("div");
+        row.className = "msg-row " + role;
+        var bubble = document.createElement("div");
+        bubble.className = "bubble " + role;
+        bubble.textContent = text;
+        row.appendChild(bubble);
+        messagesEl.appendChild(row);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function setTyping(show) {
+        var existing = messagesEl.querySelector(".typing-row");
+        if (existing) existing.remove();
+        if (!show) return;
+        var row = document.createElement("div");
+        row.className = "msg-row bot typing-row";
+        var bubble = document.createElement("div");
+        bubble.className = "bubble typing";
+        bubble.textContent = "Typing...";
+        row.appendChild(bubble);
+        messagesEl.appendChild(row);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function sendMessage(text) {
+        busy = true;
+        sendBtn.disabled = true;
+        setTyping(true);
+
+        fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text }),
+        })
+          .then(function (res) {
+            return res.json().then(function (data) {
+              if (!res.ok) throw new Error((data && data.error) || "Request failed");
+              return data;
+            });
+          })
+          .then(function (data) {
+            setTyping(false);
+            addMessage(data.answer || "No response received.", "bot");
+          })
+          .catch(function () {
+            setTyping(false);
+            addMessage(
+              "Sorry, I couldn't reach the assistant. Please try again later.",
+              "bot"
+            );
+          })
+          .finally(function () {
+            busy = false;
+            sendBtn.disabled = false;
+            input.focus();
+          });
+      }
+    })();
+  </script>
+</body>
+</html>

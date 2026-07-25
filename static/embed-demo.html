@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EnerTech Widget Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      margin: 0;
+      font-family: "Plus Jakarta Sans", Segoe UI, sans-serif;
+      background: linear-gradient(160deg, #E9EEF8 0%, #FFFFFF 100%);
+      color: #1A2140;
+      min-height: 100vh;
+    }
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 64px 24px;
+    }
+    .badge {
+      display: inline-block;
+      background: rgba(11, 35, 136, 0.08);
+      color: #0B2388;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      padding: 6px 10px;
+      border-radius: 999px;
+      margin-bottom: 16px;
+    }
+    h1 {
+      font-size: 2.2rem;
+      margin: 0 0 12px;
+      color: #0B2388;
+      font-weight: 700;
+    }
+    p {
+      line-height: 1.7;
+      color: #4A5270;
+      font-size: 1.05rem;
+      max-width: 560px;
+    }
+    code {
+      background: #EEF1F8;
+      color: #0B2388;
+      padding: 2px 7px;
+      border-radius: 6px;
+      font-family: Consolas, monospace;
+      font-size: 0.92rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="badge">Widget preview</div>
+    <h1>Your Website</h1>
+    <p>
+      This is a sample page. The EnerTech chatbot button appears in the
+      bottom-right corner — clean blue and white theme, ready for any site.
+    </p>
+    <p>
+      Paste the widget script before <code>&lt;/body&gt;</code> on your website.
+    </p>
+  </main>
+
+  <script
+    src="http://127.0.0.1:8080/static/widget.js"
+    data-base-url="http://127.0.0.1:8080"
+    data-title="EnerTech Assistant"
+    data-subtitle="Online · Ready to help"
+    data-welcome="Hello! I'm your EnerTech assistant. Ask me about UPS, batteries, or power solutions."
+    data-primary-color="#0B2388"
+    data-position="right"
+    async
+  ></script>
+</body>
+</html>
