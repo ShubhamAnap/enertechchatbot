@@ -47,11 +47,28 @@
       var input = document.getElementById("text");
       var sendBtn = document.getElementById("send");
       var busy = false;
+      var sessionId = loadSessionId();
 
-      addMessage(
-        "Hello! I'm your EnerTech assistant. Ask me about UPS, batteries, or power solutions.",
-        "bot"
-      );
+      // Kept per tab so the bot follows the conversation across reloads, and a
+      // new tab always starts a clean chat.
+      function loadSessionId() {
+        try {
+          var existing = sessionStorage.getItem("enertechSessionId");
+          if (existing) return existing;
+          var created = createSessionId();
+          sessionStorage.setItem("enertechSessionId", created);
+          return created;
+        } catch (e) {
+          return createSessionId();
+        }
+      }
+
+      function createSessionId() {
+        if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+        return "s-" + Date.now() + "-" + Math.random().toString(36).slice(2, 12);
+      }
+
+      addMessage({{ welcome | tojson }}, "bot");
 
       form.addEventListener("submit", function (event) {
         event.preventDefault();
@@ -96,7 +113,7 @@
         fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text }),
+          body: JSON.stringify({ message: text, session_id: sessionId }),
         })
           .then(function (res) {
             return res.json().then(function (data) {
@@ -106,6 +123,12 @@
           })
           .then(function (data) {
             setTyping(false);
+            if (data.session_id && data.session_id !== sessionId) {
+              sessionId = data.session_id;
+              try {
+                sessionStorage.setItem("enertechSessionId", sessionId);
+              } catch (e) {}
+            }
             addMessage(data.answer || "No response received.", "bot");
           })
           .catch(function () {

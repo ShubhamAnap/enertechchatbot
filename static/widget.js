@@ -14,12 +14,18 @@
     ""
   ).replace(/\/$/, "");
 
+  var SESSION_STORAGE_KEY = "enertechSessionId";
+
   var title = (script && script.getAttribute("data-title")) || "EnerTech Assistant";
   var subtitle =
     (script && script.getAttribute("data-subtitle")) || "Online · Ready to help";
+  // Keep in sync with welcome_message in src/prompt.py, which is replayed into
+  // the model's history so it does not repeat the menu.
   var welcome =
     (script && script.getAttribute("data-welcome")) ||
-    "Hello! I'm your EnerTech assistant. Ask me about UPS, batteries, or power solutions.";
+    "Welcome to EnerTech UPS Pvt. Ltd. \uD83D\uDC4B How can I help you today?\n" +
+      "1. Sales - Product info, pricing & purchase\n" +
+      "2. Service - Support for your existing inverter/UPS/product";
   var primaryColor =
     (script && script.getAttribute("data-primary-color")) || "#0B2388";
   var position =
@@ -164,6 +170,7 @@
   var closeBtn = panel.querySelector(".close-btn");
   var open = false;
   var busy = false;
+  var sessionId = loadSessionId();
 
   addMessage(welcome, "bot");
 
@@ -207,6 +214,33 @@
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
+  // Kept per tab so the bot follows the conversation while the visitor browses
+  // the site, and a new tab always starts a clean chat.
+  function loadSessionId() {
+    try {
+      var existing = sessionStorage.getItem(SESSION_STORAGE_KEY);
+      if (existing) return existing;
+      var created = createSessionId();
+      sessionStorage.setItem(SESSION_STORAGE_KEY, created);
+      return created;
+    } catch (e) {
+      return createSessionId();
+    }
+  }
+
+  function createSessionId() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "s-" + Date.now() + "-" + Math.random().toString(36).slice(2, 12);
+  }
+
+  function rememberSessionId(value) {
+    if (!value || value === sessionId) return;
+    sessionId = value;
+    try {
+      sessionStorage.setItem(SESSION_STORAGE_KEY, sessionId);
+    } catch (e) {}
+  }
+
   function sendMessage(text) {
     busy = true;
     sendBtn.disabled = true;
@@ -218,7 +252,7 @@
     fetch(baseUrl + "/api/chat", {
       method: "POST",
       headers: headers,
-      body: JSON.stringify({ message: text }),
+      body: JSON.stringify({ message: text, session_id: sessionId }),
     })
       .then(function (res) {
         return res.json().then(function (data) {
@@ -228,6 +262,7 @@
       })
       .then(function (data) {
         setTyping(false);
+        rememberSessionId(data.session_id);
         addMessage(data.answer || "No response received.", "bot");
       })
       .catch(function (err) {
